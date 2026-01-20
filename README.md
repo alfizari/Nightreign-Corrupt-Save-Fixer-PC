@@ -1,6 +1,8 @@
 # Nightreign-Corrupt-Save-Fixer-PC
 Attempts to fix corrupt Elden ring Nightreign saves for PC version
 
+For saves after the DLC release
+
 #  How to use:
   1-Load your save.
 
@@ -11,3 +13,8 @@ Attempts to fix corrupt Elden ring Nightreign saves for PC version
   4-Input steam id.
 
   5-Save file.
+
+#  Warning:
+
+Some data and progress could be lost, should not effect your relics.
+
