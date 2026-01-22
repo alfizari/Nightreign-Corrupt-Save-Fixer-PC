@@ -1,6 +1,8 @@
 # Nightreign-Corrupt-Save-Fixer-PC
 Attempts to fix corrupt Elden ring Nightreign saves for PC version
 
+Also fixes when the game crashes when loading a save
+
 For saves after the DLC release
 
 #  How to use:
