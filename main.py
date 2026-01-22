@@ -141,7 +141,8 @@ def save_file():
 ITEM_TYPE_EMPTY = 0x00000000
 ITEM_TYPE_WEAPON = 0x80000000
 ITEM_TYPE_ARMOR  = 0x90000000
-ITEM_TYPE_RELIC  = 0xC0000000    
+ITEM_TYPE_RELIC  = 0xC0000000
+
 
 class Item:
     BASE_SIZE = 8
@@ -261,6 +262,7 @@ def gaprint(data_type):
         if type_bits == ITEM_TYPE_RELIC:
             ga_relic.append(parsed_item)
 
+    print('end_offset real:', end_offset)
     return end_offset
 
 def parse_save():
@@ -273,7 +275,7 @@ def parse_save():
     new_flag=False
 
     end=gaprint(data)
-
+    
     player_data = 0x1af + end
     print('player_data:', player_data)
 
@@ -488,6 +490,110 @@ def merge_save():
     return
 
 
+class Item_re:
+    BASE_SIZE = 8
+
+    def __init__(self, gaitem_handle, item_id,raw,offset, extra=None, size=BASE_SIZE):
+        self.gaitem_handle = gaitem_handle
+        self.item_id = item_id
+        self.raw=raw
+        self.offset = offset
+    
+        self.size = size
+        self.padding = extra or ()
+
+    @classmethod
+    def from_bytes(cls, data_type, offset=0):
+        data_len = len(data_type)
+
+        # Check if we have enough data for the base read
+        if offset + cls.BASE_SIZE > data_len:
+            # Return empty item if not enough data
+            return cls(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, offset, size=cls.BASE_SIZE)
+
+        gaitem_handle, item_id = struct.unpack_from("<II", data_type, offset)
+        type_bits = gaitem_handle & 0xF0000000
+        cursor = offset + cls.BASE_SIZE
+        size = cls.BASE_SIZE
+        raw = b''
+        padding = ()
+
+        if gaitem_handle != 0:
+            if type_bits == ITEM_TYPE_WEAPON:
+                raw= data_type[cursor:cursor+80]
+                cursor += 80
+                size = cursor - offset
+            elif type_bits == ITEM_TYPE_ARMOR:
+                raw= data_type[cursor:cursor+8]
+                cursor += 8
+                size = cursor - offset
+            elif type_bits == ITEM_TYPE_RELIC:
+                raw= data_type[cursor:cursor+72]
+                cursor += 72
+                size = cursor - offset
+
+        return cls(gaitem_handle, item_id, raw, offset, extra=padding, size=size)
+
+    
+
+
+def parse_itemss(data_type, start_offset, slot_count=5120):
+    items = []
+    offset = start_offset
+    for _ in range(slot_count):
+        item = Item_re.from_bytes(data_type, offset)
+        items.append(item)
+        offset += item.size
+    return items, offset
+
+def rebuild_ga():
+    global data
+    ga_items = []
+    start_offset = 0x14
+    slot_count = 5120
+    items, end_offset = parse_itemss(data, start_offset, slot_count)
+
+
+    ITEM_TYPE_SPECIAL= [0xF0000000, 0x70000000, 0x60000000, 0x50000000, 0x40000000, 0x20000000, 0x10000000, 0x30000000, 0xD0000000, 0xE0000000, 0xB0000000, 0xA0000000]
+
+    for item in items:
+        type_bits = item.gaitem_handle & 0xF0000000
+
+        if type_bits == ITEM_TYPE_EMPTY or type_bits in ITEM_TYPE_SPECIAL:
+
+            parsed_item = (
+                0,              # ga (0x00000000)
+                0xFFFFFFFF,     # ids (4294967295)
+                b'',           
+                item.offset,
+                item.size,
+            )
+        else:
+            parsed_item = (
+                item.gaitem_handle,
+                item.item_id,
+                item.raw,
+                item.offset,
+                item.size,
+            )
+        ga_items.append(parsed_item)
+
+    rebuild = bytearray()
+    for ga, ids, raw, offset, size in ga_items:
+        slot = struct.pack("<I", ga) + struct.pack("<I", ids) + raw
+        rebuild.extend(slot)
+
+    data= data[:0x14] + rebuild + data[end_offset:]
+
+    messagebox.showinfo("Success", "Crash fix applied successfully.")
+
+    return end_offset
+
+
+
+
+
+
 #UI Setup
 root = tk.Tk()
 root.title("Nightreign Save Fixer")
@@ -539,11 +645,21 @@ open_btn.grid(row=0, column=0, sticky="w")
 
 fix_btn = ttk.Button(
     action_frame,
-    text="Fix Save",
+    text="Fix corrupt Save",
     command=parse_save,
     style="Action.TButton"
 )
 fix_btn.grid(row=0, column=1, padx=5)
+
+
+
+crash_fix_btn = ttk.Button(
+    action_frame,
+    text="Crash Fixer (Experimental)",
+    command=rebuild_ga,
+    style="Action.TButton"
+)   
+crash_fix_btn.grid(row=0, column=2, padx=5)
 
 save_btn = ttk.Button(
     action_frame,
@@ -551,8 +667,7 @@ save_btn = ttk.Button(
     command=save_file,
     style="Action.TButton"
 )
-save_btn.grid(row=0, column=2)
-
+save_btn.grid(row=0, column=3)
 
 char_container = ttk.LabelFrame(
     main_frame,
